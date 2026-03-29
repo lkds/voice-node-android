@@ -3,10 +3,7 @@ package com.openclaw.voicenode.node
 import com.openclaw.voicenode.voice.STTClient
 import com.openclaw.voicenode.voice.TTSClient
 import kotlinx.coroutines.*
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.longOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import org.json.JSONObject
 
 /**
  * Node 命令处理器 - 处理 Gateway 发来的 node.invoke 命令
@@ -29,12 +26,12 @@ class NodeCommandHandler(
     /**
      * 处理命令
      * @param command 命令名称，如 "voice.listen"
-     * @param params 命令参数 (JsonObject)
+     * @param params 命令参数 (JSONObject)
      * @return 响应结果 Map
      */
     suspend fun handleCommand(
         command: String,
-        params: JsonObject?
+        params: JSONObject?
     ): Map<String, Any> = withContext(Dispatchers.IO) {
         when (command) {
             "voice.listen" -> handleVoiceListen(params)
@@ -47,8 +44,8 @@ class NodeCommandHandler(
     /**
      * 处理 voice.listen 命令
      */
-    private suspend fun handleVoiceListen(params: JsonObject?): Map<String, Any> {
-        val timeout = params?.get("timeout")?.jsonPrimitive?.longOrNull ?: 10000L
+    private suspend fun handleVoiceListen(params: JSONObject?): Map<String, Any> {
+        val timeout = params?.optLong("timeout", 10000L) ?: 10000L
         
         return try {
             var finalText = ""
@@ -96,8 +93,8 @@ class NodeCommandHandler(
     /**
      * 处理 voice.speak 命令
      */
-    private suspend fun handleVoiceSpeak(params: JsonObject?): Map<String, Any> {
-        val text = params?.get("text")?.jsonPrimitive?.content ?: ""
+    private suspend fun handleVoiceSpeak(params: JSONObject?): Map<String, Any> {
+        val text = params?.optString("text", "") ?: ""
         
         if (text.isEmpty()) {
             return mapOf("error" to "Text is required", "success" to false)

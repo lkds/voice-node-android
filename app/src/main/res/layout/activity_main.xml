@@ -21,7 +21,8 @@
             android:textSize="24sp"
             android:textStyle="bold"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintCenterX="Parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginTop="16dp"/>
 
         <!-- 状态文本 -->
@@ -33,7 +34,8 @@
             android:textSize="16sp"
             android:textColor="@android:color/darker_gray"
             app:layout_constraintTop_toBottomOf="@id/titleText"
-            app:layout_constraintCenterX="Parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginTop="8dp"/>
 
         <!-- 语音状态 -->
@@ -45,7 +47,8 @@
             android:textSize="14sp"
             android:textColor="@android:color/darker_gray"
             app:layout_constraintTop_toBottomOf="@id/statusText"
-            app:layout_constraintCenterX="Parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginTop="4dp"/>
 
         <!-- 分隔线 -->

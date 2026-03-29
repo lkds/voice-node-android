@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Voice Node</string>
+    <string name="notification_channel_name">语音服务</string>
+    <string name="notification_channel_desc">后台语音监听服务运行状态</string>
+</resources>

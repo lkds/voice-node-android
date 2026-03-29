@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <!-- 状态文本 -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="状态: 未连接"
+        android:textSize="18sp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintCenterX_toParent="true"
+        android:layout_marginTop="32dp"/>
+
+    <!-- Gateway URL 输入 -->
+    <EditText
+        android:id="@+id/gatewayUrlInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Gateway URL (如 ws://192.168.1.100:18789)"
+        android:inputType="textUri"
+        app:layout_constraintTop_toBottomOf="@id/statusText"
+        android:layout_marginTop="24dp"/>
+
+    <!-- 连接按钮 -->
+    <Button
+        android:id="@+id/connectButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="连接 Gateway"
+        app:layout_constraintTop_toBottomOf="@id/gatewayUrlInput"
+        android:layout_marginTop="16dp"/>
+
+    <!-- 启动服务按钮 -->
+    <Button
+        android:id="@+id/startButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="启动语音服务"
+        android:enabled="false"
+        app:layout_constraintTop_toBottomOf="@id/connectButton"
+        android:layout_marginTop="16dp"/>
+
+    <!-- 停止服务按钮 -->
+    <Button
+        android:id="@+id/stopButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="停止服务"
+        android:enabled="false"
+        app:layout_constraintTop_toBottomOf="@id/startButton"
+        android:layout_marginTop="16dp"/>
+
+    <!-- 日志输出 -->
+    <TextView
+        android:id="@+id/logText"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:text="日志:\n"
+        android:textSize="12sp"
+        android:scrollbars="vertical"
+        app:layout_constraintTop_toBottomOf="@id/stopButton"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_marginTop="24dp"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

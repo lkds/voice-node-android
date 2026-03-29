@@ -134,8 +134,8 @@ class VoiceNodeService : Service(), MessageHandler {
     }
     
     private fun updateNotification(text: String) {
-        getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            .notify(NOTIFICATION_ID, createNotification(text))
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID, createNotification(text))
     }
 
     private fun createNotification(contentText: String): Notification {

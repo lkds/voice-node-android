@@ -6,6 +6,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Node 命令处理器 - 处理 Gateway 发来的 node.invoke 命令

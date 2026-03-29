@@ -475,7 +475,7 @@ sealed class NodeMessage {
         val type: String = "res",
         val id: String,
         val ok: Boolean,
-        val payload: Any? = null,
+        val payload: JsonElement? = null,
         val error: String? = null
     ) : NodeMessage()
     
@@ -483,7 +483,7 @@ sealed class NodeMessage {
     data class Event(
         val type: String = "event",
         val event: String,
-        val payload: Any? = null
+        val payload: JsonElement? = null
     ) : NodeMessage()
 }
 

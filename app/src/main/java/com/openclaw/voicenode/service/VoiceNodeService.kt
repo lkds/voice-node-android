@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import java.util.*
 
 /**
@@ -309,7 +310,7 @@ class VoiceNodeService : Service(), MessageHandler {
      * 处理 voice.listen 命令
      */
     private suspend fun handleVoiceListen(params: JsonObject?): Map<String, Any> {
-        val timeout = params?.get("timeout")?.jsonPrimitive?.long ?: 10000L
+        val timeout = params?.get("timeout")?.jsonPrimitive?.longOrNull ?: 10000L
         
         log("开始语音识别，超时: ${timeout}ms")
         _voiceState.value = VoiceState.Listening

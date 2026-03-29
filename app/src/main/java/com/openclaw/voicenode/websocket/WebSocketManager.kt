@@ -146,11 +146,11 @@ class WebSocketManager private constructor() {
     /**
      * 发送响应消息
      */
-    fun sendResponse(id: String, result: Any?, error: String? = null) {
+    fun sendResponse(id: String, result: Map<String, Any>?, error: String? = null) {
         val message = if (error != null) {
             NodeMessage.Response(id = id, ok = false, error = error)
         } else {
-            NodeMessage.Response(id = id, ok = true, payload = result)
+            NodeMessage.Response(id = id, ok = true, payload = result?.let { Json.encodeToString(it) })
         }
         sendMessage(message)
     }
@@ -158,8 +158,8 @@ class WebSocketManager private constructor() {
     /**
      * 发送事件消息
      */
-    fun sendEvent(event: String, data: Any? = null) {
-        val message = NodeMessage.Event(event = event, payload = data)
+    fun sendEvent(event: String, data: Map<String, Any>? = null) {
+        val message = NodeMessage.Event(event = event, payload = data?.let { Json.encodeToString(it) })
         sendMessage(message)
     }
 
@@ -475,7 +475,7 @@ sealed class NodeMessage {
         val type: String = "res",
         val id: String,
         val ok: Boolean,
-        val payload: JsonElement? = null,
+        val payload: String? = null,
         val error: String? = null
     ) : NodeMessage()
     
@@ -483,7 +483,7 @@ sealed class NodeMessage {
     data class Event(
         val type: String = "event",
         val event: String,
-        val payload: JsonElement? = null
+        val payload: String? = null
     ) : NodeMessage()
 }
 

@@ -5,6 +5,9 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.callbackFlow
 import java.util.*
 
@@ -16,11 +19,15 @@ class TTSClient(private val context: Context) {
     private var tts: TextToSpeech? = null
     private var isInitialized = false
     
+    // 用于观察 TTS 事件
+    private val _speakFlow = MutableSharedFlow<Result>(replay = 0)
+    val speakFlow: SharedFlow<Result> = _speakFlow.asSharedFlow()
+    
     sealed class Result {
         object Ready : Result()
         data class Start(val utteranceId: String) : Result()
         data class Done(val utteranceId: String) : Result()
-        data class Error(val utteranceId: String) : Result()
+        data class Error(val utteranceId: String, val error: Int = 0) : Result()
     }
 
     /**
@@ -30,25 +37,50 @@ class TTSClient(private val context: Context) {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 isInitialized = true
-                tts?.language = Locale.CHINESE
+                
+                // 设置中文语音
+                val localeResult = tts?.setLanguage(Locale.CHINESE)
+                if (localeResult == TextToSpeech.LANG_MISSING_DATA || localeResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    // 回退到英文
+                    tts?.setLanguage(Locale.US)
+                }
                 
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
-                        utteranceId?.let { trySend(Result.Start(it)) }
+                        utteranceId?.let { 
+                            trySend(Result.Start(it))
+                            _speakFlow.tryEmit(Result.Start(it))
+                        }
                     }
                     
                     override fun onDone(utteranceId: String?) {
-                        utteranceId?.let { trySend(Result.Done(it)) }
+                        utteranceId?.let { 
+                            trySend(Result.Done(it))
+                            _speakFlow.tryEmit(Result.Done(it))
+                        }
                     }
                     
                     override fun onError(utteranceId: String?) {
-                        utteranceId?.let { trySend(Result.Error(it)) }
+                        utteranceId?.let { 
+                            trySend(Result.Error(it))
+                            _speakFlow.tryEmit(Result.Error(it))
+                        }
+                    }
+                    
+                    // Android 12+ 支持更详细的错误回调
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?, errorCode: Int) {
+                        utteranceId?.let { 
+                            trySend(Result.Error(it, errorCode))
+                            _speakFlow.tryEmit(Result.Error(it, errorCode))
+                        }
                     }
                 })
                 
                 trySend(Result.Ready)
+            } else {
+                close(Exception("TTS initialization failed with status: $status"))
             }
-            close()
         }
         
         awaitClose {
@@ -57,7 +89,7 @@ class TTSClient(private val context: Context) {
     }
 
     /**
-     * 播放文本
+     * 播放文本（替换队列）
      */
     fun speak(text: String, utteranceId: String = UUID.randomUUID().toString()): Boolean {
         if (!isInitialized) return false
@@ -91,6 +123,13 @@ class TTSClient(private val context: Context) {
      */
     fun setPitch(pitch: Float) {
         tts?.setPitch(pitch)
+    }
+    
+    /**
+     * 设置语言
+     */
+    fun setLanguage(locale: Locale): Int {
+        return tts?.setLanguage(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
     }
 
     /**

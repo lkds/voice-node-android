@@ -3,10 +3,17 @@ package com.openclaw.voicenode.node
 import com.openclaw.voicenode.voice.STTClient
 import com.openclaw.voicenode.voice.TTSClient
 import kotlinx.coroutines.*
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * Node 命令处理器 - 处理 Gateway 发来的 node.invoke 命令
+ * 
+ * 支持的命令:
+ * - voice.listen: 开始语音识别
+ * - voice.speak: 语音合成播放
+ * - voice.stop: 停止当前操作
  */
 class NodeCommandHandler(
     private val sttClient: STTClient,
@@ -14,95 +21,152 @@ class NodeCommandHandler(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
+    // 当前操作
+    private var currentListenJob: Job? = null
+    private var currentSpeakJob: Job? = null
+    
     /**
-     * 处理 node.invoke 命令
+     * 处理命令
      * @param command 命令名称，如 "voice.listen"
-     * @param params 命令参数
-     * @param requestId 请求 ID，用于响应
-     * @return 响应结果
+     * @param params 命令参数 (JsonObject)
+     * @return 响应结果 Map
      */
     suspend fun handleCommand(
         command: String,
-        params: JSONObject,
-        requestId: String
-    ): NodeResponse = withContext(Dispatchers.IO) {
+        params: JsonObject?
+    ): Map<String, Any> = withContext(Dispatchers.IO) {
         when (command) {
             "voice.listen" -> handleVoiceListen(params)
             "voice.speak" -> handleVoiceSpeak(params)
             "voice.stop" -> handleVoiceStop()
-            else -> NodeResponse.Error("Unknown command: $command")
+            else -> mapOf("error" to "Unknown command: $command")
         }
     }
 
     /**
      * 处理 voice.listen 命令
      */
-    private suspend fun handleVoiceListen(params: JSONObject): NodeResponse {
-        val timeout = params.optLong("timeout", 10000)
+    private suspend fun handleVoiceListen(params: JsonObject?): Map<String, Any> {
+        val timeout = params?.get("timeout")?.jsonPrimitive?.longOrNull ?: 10000L
         
         return try {
             var finalText = ""
             var hasError = false
             var errorMessage = ""
+            var partialText = ""
             
-            sttClient.listen(timeout).collect { result ->
-                when (result) {
-                    is STTClient.Result.Success -> {
-                        finalText = result.text
-                    }
-                    is STTClient.Result.Error -> {
-                        hasError = true
-                        errorMessage = result.message
-                    }
-                    else -> {
-                        // 其他状态：Ready, Begin, End, Partial
+            currentListenJob = scope.launch {
+                sttClient.listen(timeout).collect { result ->
+                    when (result) {
+                        is STTClient.Result.Success -> {
+                            finalText = result.text
+                        }
+                        is STTClient.Result.Partial -> {
+                            partialText = result.text
+                        }
+                        is STTClient.Result.Error -> {
+                            hasError = true
+                            errorMessage = result.message
+                        }
+                        else -> {
+                            // Ready, Begin, End
+                        }
                     }
                 }
             }
             
+            currentListenJob?.join()
+            currentListenJob = null
+            
             if (hasError) {
-                NodeResponse.Error(errorMessage)
+                mapOf("error" to errorMessage, "success" to false)
             } else {
-                NodeResponse.Success(mapOf("text" to finalText))
+                mapOf(
+                    "text" to finalText,
+                    "partial" to partialText,
+                    "success" to true
+                )
             }
         } catch (e: Exception) {
-            NodeResponse.Error(e.message ?: "STT failed")
+            mapOf("error" to (e.message ?: "STT failed"), "success" to false)
         }
     }
 
     /**
      * 处理 voice.speak 命令
      */
-    private suspend fun handleVoiceSpeak(params: JSONObject): NodeResponse {
-        val text = params.optString("text", "")
+    private suspend fun handleVoiceSpeak(params: JsonObject?): Map<String, Any> {
+        val text = params?.get("text")?.jsonPrimitive?.content ?: ""
         
         if (text.isEmpty()) {
-            return NodeResponse.Error("Text is required")
+            return mapOf("error" to "Text is required", "success" to false)
         }
         
         return try {
             val utteranceId = java.util.UUID.randomUUID().toString()
+            var completed = false
+            var hasError = false
+            
+            currentSpeakJob = scope.launch {
+                ttsClient.speakFlow.collect { result ->
+                    when (result) {
+                        is TTSClient.Result.Done -> {
+                            if (result.utteranceId == utteranceId) {
+                                completed = true
+                                cancel()
+                            }
+                        }
+                        is TTSClient.Result.Error -> {
+                            hasError = true
+                            cancel()
+                        }
+                        else -> {}
+                    }
+                }
+            }
+            
             val success = ttsClient.speak(text, utteranceId)
             
-            if (success) {
-                // 等待播放完成
-                // TODO: 使用 Flow 等待播放完成
-                NodeResponse.Success(mapOf("utteranceId" to utteranceId))
+            if (!success) {
+                currentSpeakJob?.cancel()
+                currentSpeakJob = null
+                return mapOf("error" to "TTS failed to start", "success" to false)
+            }
+            
+            // 等待播放完成（最多 60 秒）
+            withTimeoutOrNull(60000) {
+                while (!completed && !hasError) {
+                    delay(100)
+                }
+            }
+            
+            currentSpeakJob?.cancel()
+            currentSpeakJob = null
+            
+            if (hasError) {
+                mapOf("error" to "TTS playback error", "success" to false)
             } else {
-                NodeResponse.Error("TTS failed to start")
+                mapOf("utteranceId" to utteranceId, "success" to true)
             }
         } catch (e: Exception) {
-            NodeResponse.Error(e.message ?: "TTS failed")
+            mapOf("error" to (e.message ?: "TTS failed"), "success" to false)
         }
     }
 
     /**
      * 处理 voice.stop 命令
      */
-    private fun handleVoiceStop(): NodeResponse {
-        ttsClient.stop()
+    private fun handleVoiceStop(): Map<String, Any> {
+        currentListenJob?.cancel()
+        currentListenJob = null
+        
+        currentSpeakJob?.cancel()
+        currentSpeakJob = null
+        
         sttClient.cancel()
-        return NodeResponse.Success(mapOf("stopped" to true))
+        ttsClient.stop()
+        
+        return mapOf("stopped" to true, "success" to true)
     }
 
     /**
@@ -110,20 +174,9 @@ class NodeCommandHandler(
      */
     fun destroy() {
         scope.cancel()
+        currentListenJob?.cancel()
+        currentSpeakJob?.cancel()
         sttClient.cancel()
         ttsClient.shutdown()
-    }
-}
-
-/**
- * Node 响应密封类
- */
-sealed class NodeResponse {
-    data class Success(val data: Map<String, Any>) : NodeResponse()
-    data class Error(val message: String) : NodeResponse()
-    
-    fun toMap(): Map<String, Any> = when (this) {
-        is Success -> mapOf("ok" to true, "data" to data)
-        is Error -> mapOf("ok" to false, "error" to message)
     }
 }
